@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Покер</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: white;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: rgba(0, 0, 0, 0.7);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            max-width: 800px;
+            width: 100%;
+            position: relative;
+            margin-top: 20px;
+        }
+
+        .back-button {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background-color: rgba(248, 211, 71, 0.2);
+            color: #f8d347;
+            border: 1px solid #f8d347;
+            padding: 8px 15px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .back-button:hover {
+            background-color: rgba(248, 211, 71, 0.4);
+            transform: translateX(-3px);
+        }
+
+        .back-button::before {
+            content: "←";
+        }
+
+        h1 {
+            color: #f8d347;
+            text-shadow: 0 0 10px rgba(248, 211, 71, 0.5);
+            margin-top: 10px;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            color: #ccc;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .game-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin: 20px 0;
+            width: 100%;
+        }
+
+        .hand {
+            background-color: rgba(51, 51, 51, 0.7);
+            border-radius: 10px;
+            padding: 15px;
+            min-height: 120px;
+            position: relative;
+        }
+
+        .hand-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #f8d347;
+        }
+
+        .cards {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            min-height: 80px;
+        }
+
+        .card {
+            width: 60px;
+            height: 90px;
+            background-color: white;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            color: black;
+            position: relative;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .card.red {
+            color: red;
+        }
+
+        .card-back {
+            background: linear-gradient(135deg, #d10000, #8b0000);
+            color: white;
+            font-size: 14px;
+        }
+
+        .community-cards {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .game-panel {
+            background-color: rgba(51, 51, 51, 0.7);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .balance {
+            font-size: 22px;
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .balance-amount {
+            font-weight: bold;
+            color: #f8d347;
+        }
+
+        .pot {
+            font-size: 20px;
+            margin: 15px 0;
+            color: #f8d347;
+        }
+
+        .settings {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .setting-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .setting-group label {
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #ddd;
+        }
+
+        .setting-group input {
+            padding: 8px 12px;
+            border-radius: 5px;
+            border: none;
+            background-color: #444;
+            color: white;
+            text-align: center;
+            width: 80px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .game-button {
+            background-color: #f8d347;
+            color: #333;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            box-shadow: 0 4px 0 #d4b53c;
+            min-width: 100px;
+        }
+
+        .game-button:hover {
+            background-color: #ffea00;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0 #d4b53c;
+        }
+
+        .game-button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #d4b53c;
+        }
+
+        .game-button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 0 4px 0 #aaaaaa;
+        }
+
+        .check-button {
+            background-color: #4CAF50;
+            box-shadow: 0 4px 0 #3e8e41;
+        }
+
+        .check-button:hover {
+            background-color: #66BB6A;
+            box-shadow: 0 6px 0 #3e8e41;
+        }
+
+        .fold-button {
+            background-color: #f44336;
+            box-shadow: 0 4px 0 #d32f2f;
+        }
+
+        .fold-button:hover {
+            background-color: #ef5350;
+            box-shadow: 0 6px 0 #d32f2f;
+        }
+
+        .call-button {
+            background-color: #2196F3;
+            box-shadow: 0 4px 0 #1565C0;
+        }
+
+        .call-button:hover {
+            background-color: #42A5F5;
+            box-shadow: 0 6px 0 #1565C0;
+        }
+
+        .raise-button {
+            background-color: #FF9800;
+            box-shadow: 0 4px 0 #F57C00;
+        }
+
+        .raise-button:hover {
+            background-color: #FFA726;
+            box-shadow: 0 6px 0 #F57C00;
+        }
+
+        .message {
+            color: #f8d347;
+            font-size: 18px;
+            font-weight: bold;
+            height: 30px;
+            margin: 10px 0;
+            text-shadow: 0 0 5px rgba(248, 211, 71, 0.5);
+        }
+
+        .player-status {
+            font-size: 16px;
+            margin-top: 5px;
+            color: #ddd;
+        }
+
+        .info {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #999;
+            line-height: 1.4;
+        }
+
+        /* Эффекты */
+        .win-glow {
+            animation: winGlow 1s infinite alternate;
+        }
+
+        @keyframes winGlow {
+            from { box-shadow: 0 0 10px gold; }
+            to { box-shadow: 0 0 30px gold; }
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px 15px;
+            }
+
+            .card {
+                width: 50px;
+                height: 75px;
+                font-size: 20px;
+            }
+
+            .controls {
+                gap: 10px;
+            }
+
+            .game-button {
+                padding: 10px 15px;
+                font-size: 14px;
+                min-width: 80px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button class="back-button" onclick="window.location.href='index.html'">Меню</button>
+
+        <h1>💰 Техасский Холдем</h1>
+        <p class="subtitle">Сыграйте в покер против компьютера!</p>
+
+        <div class="game-panel">
+            <div class="balance">
+                Баланс: <span id="balance" class="balance-amount">1000</span> кредитов
+            </div>
+
+            <div class="pot" id="pot">
+                Банк: 0 кредитов
+            </div>
+
+            <div class="settings">
+                <div class="setting-group">
+                    <label for="betAmount">Ставка:</label>
+                    <input type="number" id="betAmount" min="10" max="1000" value="50" step="10">
+                </div>
+            </div>
+
+            <div class="message" id="message"></div>
+        </div>
+
+        <div class="game-area">
+            <div class="hand">
+                <div class="hand-title">Дилер <span id="dealer-status" class="player-status"></span></div>
+                <div class="cards" id="dealer-cards"></div>
+            </div>
+
+            <div class="community-cards" id="community-cards"></div>
+
+            <div class="hand">
+                <div class="hand-title">Игрок <span id="player-status" class="player-status"></span></div>
+                <div class="cards" id="player-cards"></div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="dealButton" class="game-button">Начать игру</button>
+            <button id="checkButton" class="game-button check-button" disabled>Чек</button>
+            <button id="callButton" class="game-button call-button" disabled>Колл</button>
+            <button id="raiseButton" class="game-button raise-button" disabled>Поднять</button>
+            <button id="foldButton" class="game-button fold-button" disabled>Фолд</button>
+        </div>
+
+        <div class="info">
+            <p>Правила: Техасский Холдем, 5 общих карт. Комбинации: Старшая карта, Пара, Две пары, Сет, Стрит, Флеш, Фулл-хаус, Каре, Стрит-флеш, Роял-флеш.</p>
+        </div>
+    </div>
+
+    <script>
+        // Инициализация переменных
+        const suits = ['♥', '♦', '♠', '♣'];
+        const values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+        let deck = [];
+        let playerHand = [];
+        let dealerHand = [];
+        let communityCards = [];
+        let currentBet = 50;
+        let playerBalance = localStorage.getItem('casinoBalance') ? parseInt(localStorage.getItem('casinoBalance')) : 1000;
+        let pot = 0;
+        let gameStage = 0; // 0 - начало, 1 - префлоп, 2 - флоп, 3 - терн, 4 - ривер, 5 - шоудаун
+        let dealerBet = 0;
+        let playerBetInStage = 0;
+        let dealerBetInStage = 0;
+
+        // Элементы DOM
+        const balanceDisplay = document.getElementById('balance');
+        const potDisplay = document.getElementById('pot');
+        const betAmountInput = document.getElementById('betAmount');
+        const messageDisplay = document.getElementById('message');
+        const dealerCardsDiv = document.getElementById('dealer-cards');
+        const playerCardsDiv = document.getElementById('player-cards');
+        const communityCardsDiv = document.getElementById('community-cards');
+        const dealerStatusSpan = document.getElementById('dealer-status');
+        const playerStatusSpan = document.getElementById('player-status');
+        const dealButton = document.getElementById('dealButton');
+        const checkButton = document.getElementById('checkButton');
+        const callButton = document.getElementById('callButton');
+        const raiseButton = document.getElementById('raiseButton');
+        const foldButton = document.getElementById('foldButton');
+
+        // Обновление баланса
+        function updateBalance() {
+            balanceDisplay.textContent = playerBalance;
+            localStorage.setItem('casinoBalance', playerBalance.toString());
+        }
+
+        // Создание колоды
+        function createDeck() {
+            deck = [];
+            for (let suit of suits) {
+                for (let value of values) {
+                    deck.push({ suit, value });
+                }
+            }
+            shuffleDeck();
+        }
+
+        // Перемешивание колоды
+        function shuffleDeck() {
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+        }
+
+        // Раздача карты
+        function dealCard(hand, isDealer = false, hidden = false) {
+            if (deck.length === 0) createDeck();
+            const card = deck.pop();
+            hand.push(card);
+            renderCards(isDealer, hidden);
+            return card;
+        }
+
+        // Отображение карт
+        function renderCards(isDealer, hideCards = false) {
+            const hand = isDealer ? dealerHand : playerHand;
+            const cardsDiv = isDealer ? dealerCardsDiv : playerCardsDiv;
+
+            cardsDiv.innerHTML = '';
+
+            if (hideCards && isDealer) {
+                // Скрытые карты дилера
+                for (let i = 0; i < hand.length; i++) {
+                    const cardDiv = document.createElement('div');
+                    cardDiv.className = 'card card-back';
+                    cardDiv.textContent = '?';
+                    cardsDiv.appendChild(cardDiv);
+                }
+            } else {
+                // Открытые карты
+                for (let card of hand) {
+                    const cardDiv = document.createElement('div');
+                    cardDiv.className = 'card';
+                    if (card.suit === '♥' || card.suit === '♦') {
+                        cardDiv.classList.add('red');
+                    }
+                    cardDiv.textContent = card.value + card.suit;
+                    cardsDiv.appendChild(cardDiv);
+                }
+            }
+        }
+
+        // Отображение общих карт
+        function renderCommunityCards() {
+            communityCardsDiv.innerHTML = '';
+
+            for (let card of communityCards) {
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'card';
+                if (card.suit === '♥' || card.suit === '♦') {
+                    cardDiv.classList.add('red');
+                }
+                cardDiv.textContent = card.value + card.suit;
+                communityCardsDiv.appendChild(cardDiv);
+            }
+        }
+
+        // Начало игры
+        function startGame() {
+            if (gameStage !== 0) return;
+
+            currentBet = parseInt(betAmountInput.value);
+            if (isNaN(currentBet)) {
+                messageDisplay.textContent = 'Введите корректную ставку';
+                return;
+            }
+
+            if (currentBet < 10) {
+                messageDisplay.textContent = 'Минимальная ставка - 10';
+                betAmountInput.value = 10;
+                currentBet = 10;
+                return;
+            }
+
+            if (currentBet > playerBalance) {
+                messageDisplay.textContent = 'Недостаточно средств';
+                return;
+            }
+
+            // Подготовка игры
+            createDeck();
+            playerHand = [];
+            dealerHand = [];
+            communityCards = [];
+            pot = 0;
+            gameStage = 1;
+            playerBalance -= currentBet;
+            pot += currentBet;
+            dealerBet = Math.floor(currentBet * (0.5 + Math.random() * 0.5));
+            pot += dealerBet;
+            updateBalance();
+            updatePot();
+
+            // Раздача карт
+            dealCard(playerHand);
+            dealCard(dealerHand, true, true);
+            dealCard(playerHand);
+            dealCard(dealerHand, true, true);
+
+            // Обновление интерфейса
+            dealButton.disabled = true;
+            checkButton.disabled = false;
+            callButton.disabled = false;
+            raiseButton.disabled = false;
+            foldButton.disabled = false;
+
+            playerBetInStage = currentBet;
+            dealerBetInStage = dealerBet;
+
+            messageDisplay.textContent = `Ваша ставка: ${currentBet}, ставка дилера: ${dealerBet}`;
+            playerStatusSpan.textContent = `Ставка: ${currentBet}`;
+            dealerStatusSpan.textContent = `Ставка: ${dealerBet}`;
+        }
+
+        // Обновление банка
+        function updatePot() {
+            potDisplay.textContent = `Банк: ${pot} кредитов`;
+        }
+
+        // Действие: Чек
+        function check() {
+            if (gameStage === 0 || dealerBetInStage > playerBetInStage) {
+                messageDisplay.textContent = 'Нельзя сделать чек, нужно уравнять ставку';
+                return;
+            }
+
+            messageDisplay.textContent = 'Вы сделали чек';
+            playerStatusSpan.textContent = 'Чек';
+            advanceGame();
+        }
+
+        // Действие: Колл
+        function call() {
+            const callAmount = dealerBetInStage - playerBetInStage;
+            if (callAmount <= 0) {
+                messageDisplay.textContent = 'Нельзя сделать колл, ставки равны';
+                return;
+            }
+
+            if (callAmount > playerBalance) {
+                messageDisplay.textContent = 'Недостаточно средств для колла';
+                return;
+            }
+
+            playerBalance -= callAmount;
+            pot += callAmount;
+            playerBetInStage = dealerBetInStage;
+            updateBalance();
+            updatePot();
+
+            messageDisplay.textContent = `Вы сделали колл ${callAmount}`;
+            playerStatusSpan.textContent = `Колл: ${callAmount}`;
+            advanceGame();
+        }
+
+        // Действие: Поднять ставку
+        function raise() {
+            const raiseAmount = parseInt(prompt('На сколько поднять ставку? Минимум ' + (dealerBetInStage - playerBetInStage + 10), dealerBetInStage - playerBetInStage + 10));
+
+            if (isNaN(raiseAmount) || raiseAmount < (dealerBetInStage - playerBetInStage + 10)) {
+                messageDisplay.textContent = 'Неверная сумма для повышения';
+                return;
+            }
+
+            if (playerBetInStage + raiseAmount > playerBalance) {
+                messageDisplay.textContent = 'Недостаточно средств для повышения';
+                return;
+            }
+
+            playerBalance -= raiseAmount;
+            pot += raiseAmount;
+            playerBetInStage += raiseAmount;
+            updateBalance();
+            updatePot();
+
+            // Ответ дилера
+            const dealerCall = Math.random() > 0.3; // 70% chance to call
+            if (dealerCall) {
+                const dealerRaise = Math.floor(raiseAmount * (0.5 + Math.random() * 0.5));
+                dealerBalance -= dealerRaise;
+                pot += dealerRaise;
+                dealerBetInStage += dealerRaise;
+
+                messageDisplay.textContent = `Вы подняли на ${raiseAmount}, дилер отвечает +${dealerRaise}`;
+                dealerStatusSpan.textContent = `Поднял: ${dealerRaise}`;
+            } else {
+                messageDisplay.textContent = `Вы подняли на ${raiseAmount}, дилер пасует`;
+                endGame('Дилер пасует! Вы выиграли!', pot);
+                return;
+            }
+
+            playerStatusSpan.textContent = `Поднял: ${raiseAmount}`;
+        }
+
+        // Действие: Фолд
+        function fold() {
+            messageDisplay.textContent = 'Вы сбросили карты';
+            endGame('Вы сбросили карты. Дилер выиграл!');
+        }
+
+        // Переход к следующей стадии игры
+        function advanceGame() {
+            gameStage++;
+            playerBetInStage = 0;
+            dealerBetInStage = 0;
+
+            switch(gameStage) {
+                case 2: // Флоп
+                    dealCommunityCards(3);
+                    messageDisplay.textContent = 'Флоп: 3 общие карты';
+                    break;
+                case 3: // Терн
+                    dealCommunityCards(1);
+                    messageDisplay.textContent = 'Терн: 4-я общая карта';
+                    break;
+                case 4: // Ривер
+                    dealCommunityCards(1);
+                    messageDisplay.textContent = 'Ривер: 5-я общая карта';
+                    break;
+                case 5: // Шоудаун
+                    showDown();
+                    return;
+            }
+
+            // Ход дилера
+            dealerAction();
+        }
+
+        // Раздача общих карт
+        function dealCommunityCards(count) {
+            for (let i = 0; i < count; i++) {
+                dealCard(communityCards);
+            }
+            renderCommunityCards();
+        }
+
+        // Действия дилера
+        function dealerAction() {
+            setTimeout(() => {
+                const action = Math.random();
+
+                if (action < 0.6) { // 60% chance to check/call
+                    if (playerBetInStage > dealerBetInStage) {
+                        const callAmount = playerBetInStage - dealerBetInStage;
+                        pot += callAmount;
+                        dealerBetInStage = playerBetInStage;
+                        updatePot();
+
+                        messageDisplay.textContent += ` | Дилер делает колл ${callAmount}`;
+                        dealerStatusSpan.textContent = `Колл: ${callAmount}`;
+                    } else {
+                        messageDisplay.textContent += ' | Дилер делает чек';
+                        dealerStatusSpan.textContent = 'Чек';
+                    }
+                } else if (action < 0.9) { // 30% chance to raise
+                    const raiseAmount = Math.floor(currentBet * (0.3 + Math.random() * 0.3));
+                    pot += raiseAmount;
+                    dealerBetInStage += raiseAmount;
+                    updatePot();
+
+                    messageDisplay.textContent += ` | Дилер поднимает на ${raiseAmount}`;
+                    dealerStatusSpan.textContent = `Поднял: ${raiseAmount}`;
+                } else { // 10% chance to fold
+                    messageDisplay.textContent += ' | Дилер пасует';
+                    endGame('Дилер пасует! Вы выиграли!', pot);
+                    return;
+                }
+
+                // Активируем кнопки для игрока
+                checkButton.disabled = playerBetInStage !== dealerBetInStage;
+                callButton.disabled = playerBetInStage >= dealerBetInStage;
+                raiseButton.disabled = false;
+            }, 1000);
+        }
+
+        // Шоудаун - сравнение карт
+        function showDown() {
+            // Показываем карты дилера
+            dealerCardsDiv.innerHTML = '';
+            for (let card of dealerHand) {
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'card';
+                if (card.suit === '♥' || card.suit === '♦') {
+                    cardDiv.classList.add('red');
+                }
+                cardDiv.textContent = card.value + card.suit;
+                dealerCardsDiv.appendChild(cardDiv);
+            }
+
+            // Простая логика определения победителя (без реального сравнения комбинаций)
+            const playerScore = evaluateHand([...playerHand, ...communityCards]);
+            const dealerScore = evaluateHand([...dealerHand, ...communityCards]);
+
+            if (playerScore > dealerScore) {
+                endGame(`Вы выиграли! Ваша комбинация: ${getHandName(playerScore)}`, pot);
+            } else if (playerScore < dealerScore) {
+                endGame(`Вы проиграли. Комбинация дилера: ${getHandName(dealerScore)}`);
+            } else {
+                endGame(`Ничья! Ваша комбинация: ${getHandName(playerScore)}`, pot / 2);
+            }
+        }
+
+        // Оценка комбинации (упрощенная)
+        function evaluateHand(cards) {
+            // Простая оценка без реального анализа комбинаций
+            let score = 0;
+            for (let card of cards) {
+                if (card.value === 'A') score += 14;
+                else if (card.value === 'K') score += 13;
+                else if (card.value === 'Q') score += 12;
+                else if (card.value === 'J') score += 11;
+                else score += parseInt(card.value);
+            }
+            return score;
+        }
+
+        // Название комбинации (упрощенное)
+        function getHandName(score) {
+            if (score > 100) return "Роял-флеш";
+            if (score > 90) return "Стрит-флеш";
+            if (score > 80) return "Каре";
+            if (score > 70) return "Фулл-хаус";
+            if (score > 60) return "Флеш";
+            if (score > 50) return "Стрит";
+            if (score > 40) return "Сет";
+            if (score > 30) return "Две пары";
+            if (score > 20) return "Пара";
+            return "Старшая карта";
+        }
+
+        // Завершение игры
+        function endGame(message, winnings = 0) {
+            gameStage = 0;
+
+            if (winnings > 0) {
+                playerBalance += winnings;
+                updateBalance();
+            }
+
+            messageDisplay.textContent = message;
+
+            // Обновление интерфейса
+            dealButton.disabled = false;
+            checkButton.disabled = true;
+            callButton.disabled = true;
+            raiseButton.disabled = true;
+            foldButton.disabled = true;
+
+            playerStatusSpan.textContent = '';
+            dealerStatusSpan.textContent = '';
+        }
+
+        // Обработчики событий
+        dealButton.addEventListener('click', startGame);
+        checkButton.addEventListener('click', check);
+        callButton.addEventListener('click', call);
+        raiseButton.addEventListener('click', raise);
+        foldButton.addEventListener('click', fold);
+
+        betAmountInput.addEventListener('change', function() {
+            currentBet = parseInt(this.value);
+            if (isNaN(currentBet) || currentBet < 10) {
+                this.value = 10;
+                currentBet = 10;
+            } else if (currentBet > playerBalance) {
+                this.value = Math.min(playerBalance, 1000);
+                currentBet = this.value;
+            }
+        });
+
+        // Инициализация при загрузке
+        updateBalance();
+    </script>
+</body>
+</html>

@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Game Casino Simulator</title>
+    <!-- Добавляем Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-analytics.js"></script>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -145,6 +149,54 @@
             color: #999;
         }
 
+        .user-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .user-btn {
+            background-color: rgba(248, 211, 71, 0.8);
+            color: #333;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .user-btn:hover {
+            background-color: #f8d347;
+            transform: scale(1.05);
+        }
+
+        .online-counter {
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 8px 15px;
+            border-radius: 20px;
+            margin-top: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .online-dot {
+            width: 10px;
+            height: 10px;
+            background-color: #4caf50;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
         @media (max-width: 600px) {
             .games-grid {
                 grid-template-columns: 1fr;
@@ -154,13 +206,28 @@
                 flex-direction: column;
                 align-items: center;
             }
+
+            .user-controls {
+                position: static;
+                justify-content: center;
+                margin-bottom: 15px;
+            }
         }
     </style>
 </head>
 <body>
+    <div class="user-controls">
+        <button id="userBtn" class="user-btn" onclick="window.location.href='reg.html'">Вход/Регистрация</button>
+    </div>
+
     <div class="container">
         <h1>🎰 Game Casino Simulator</h1>
         <p>Играйте бесплатно в виртуальные казино-игры!</p>
+
+        <div class="online-counter">
+            <div class="online-dot"></div>
+            <span id="onlineCount">0</span> игроков онлайн
+        </div>
 
         <div class="balance">
             Баланс: <span id="balance" class="balance-amount">1000</span> кредитов
@@ -207,6 +274,83 @@
     </div>
 
     <script>
+        // Ваша конфигурация Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyCDBRYFbAZzsc5K95dJQeRVSlyUeS0x2yg",
+            authDomain: "kazinaks.firebaseapp.com",
+            projectId: "kazinaks",
+            storageBucket: "kazinaks.appspot.com",
+            messagingSenderId: "923668859204",
+            appId: "1:923668859204:web:3696ac595e106b6f226f11",
+            measurementId: "G-7CYFK7BGL0",
+            databaseURL: "https://kazinaks-default-rtdb.firebaseio.com/" // Добавьте эту строку
+        };
+
+        // Инициализация Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        firebase.analytics();
+
+        // Функция для генерации уникального ID пользователя
+        function generateUserId() {
+            return 'user_' + Math.random().toString(36).substr(2, 9) + '_' + new Date().getTime();
+        }
+
+        // Отслеживание онлайн-пользователей
+        function trackOnlineUsers() {
+            const database = firebase.database();
+            const connectedRef = database.ref(".info/connected");
+            const usersRef = database.ref("online_users");
+
+            // Генерируем или получаем ID пользователя
+            const userId = localStorage.getItem('casinoUserId') || generateUserId();
+            localStorage.setItem('casinoUserId', userId);
+
+            connectedRef.on("value", function(snap) {
+                if (snap.val() === true) {
+                    // Добавляем пользователя в список онлайн
+                    const userRef = usersRef.child(userId);
+                    userRef.set({
+                        lastOnline: firebase.database.ServerValue.TIMESTAMP,
+                        userAgent: navigator.userAgent,
+                        page: window.location.pathname
+                    });
+
+                    // Удаляем пользователя при закрытии страницы
+                    userRef.onDisconnect().remove();
+
+                    // Обновляем счетчик онлайн
+                    usersRef.on("value", function(snapshot) {
+                        const onlineCount = snapshot.numChildren();
+                        document.getElementById("onlineCount").textContent = onlineCount;
+
+                        // Опционально: сохраняем количество онлайн в localStorage
+                        localStorage.setItem('lastOnlineCount', onlineCount);
+                    });
+                } else {
+                    // Если нет соединения, показываем последнее известное значение
+                    const lastCount = localStorage.getItem('lastOnlineCount') || '1000+';
+                    document.getElementById("onlineCount").textContent = lastCount;
+                }
+            });
+        }
+
+        // Вызываем функцию отслеживания
+        trackOnlineUsers();
+
+        // Проверка авторизации
+        const isLoggedIn = localStorage.getItem('casinoLoggedIn') === 'true';
+        const userBtn = document.getElementById('userBtn');
+
+        if (isLoggedIn) {
+            userBtn.textContent = 'Настройки';
+            userBtn.onclick = function() { window.location.href = 'account.html'; };
+        } else {
+            userBtn.textContent = 'Вход/Регистрация';
+            userBtn.onclick = function() { window.location.href = 'reg.html'; };
+        }
+
         // Сохраняем баланс между страницами
         if (!localStorage.getItem('casinoBalance')) {
             localStorage.setItem('casinoBalance', '1000');
@@ -218,15 +362,7 @@
             'ежик': { amount: 10000, used: false },
             'бонус': { amount: 5000, used: false },
             'удача': { amount: 3000, used: false },
-            '777': { amount: 7777, used: false },
-            'Мaма': { amount: 9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999990, used: false },
-            '22.11.24': { amount: 22011, used: false },
-            'илиан': { amount: 100000, used: false },
-
-            'хуй': { amount: 10000, used: false },
-            'Ирка( ＾ω＾ )': { amount: 19000, used: false },
-            'Ксю': { amount: 18900, used: false },
-
+            '777': { amount: 7777, used: false }
         };
 
         // Применение промокода

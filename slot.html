@@ -420,45 +420,27 @@
             update();
         }
 
-        // Расчет выигрыша (одинаковые шансы для всех количеств барабанов)
+        // Расчет выигрыша (только 3 в ряд)
         function calculateWin(results) {
-            // Собираем статистику по символам
-            const symbolCounts = {};
-            results.forEach(symbol => {
-                symbolCounts[symbol] = (symbolCounts[symbol] || 0) + 1;
-            });
+            // Проверяем только комбинации из 3 одинаковых символов подряд
+            for (let i = 0; i <= results.length - 3; i++) {
+                if (results[i] === results[i+1] && results[i+1] === results[i+2]) {
+                    const winningSymbol = results[i];
+                    let basePayout = 0;
 
-            // Находим максимальное количество одинаковых символов
-            const maxCount = Math.max(...Object.values(symbolCounts));
+                    // Определяем базовую выплату для символа
+                    switch(winningSymbol) {
+                        case '7️⃣': basePayout = 5; break;
+                        case '⭐': basePayout = 4; break;
+                        case '🔔': basePayout = 3; break;
+                        default: basePayout = 2; break;
+                    }
 
-            // Определяем минимальное количество для выигрыша (50-60% от общего количества барабанов)
-            const minWinCount = Math.ceil(reelCount * 0.5); // 50% округляем вверх
+                    // Меньший множитель (1.25)
+                    const winAmount = Math.round(betAmount * basePayout * 1.25);
 
-            // Если есть достаточно одинаковых символов
-            if (maxCount >= minWinCount) {
-                const winningSymbol = Object.keys(symbolCounts).find(
-                    key => symbolCounts[key] === maxCount
-                );
-
-                let basePayout = 0;
-
-                // Определяем базовую выплату для символа
-                switch(winningSymbol) {
-                    case '7️⃣': basePayout = 30; break;
-                    case '⭐': basePayout = 20; break;
-                    case '🔔': basePayout = 15; break;
-                    default: basePayout = 10; break;
+                    return { amount: winAmount, symbol: winningSymbol, count: 3 };
                 }
-
-                // Учитываем количество совпадений (чем больше, тем выше множитель)
-                const countMultiplier = maxCount / reelCount * 2;
-
-                // Рассчитываем итоговый выигрыш
-                const winAmount = Math.round(
-                    betAmount * basePayout * countMultiplier
-                );
-
-                return { amount: winAmount, symbol: winningSymbol, count: maxCount };
             }
 
             return { amount: 0 };

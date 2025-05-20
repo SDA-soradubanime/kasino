@@ -208,7 +208,10 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
 
     <script>
-        // Конфигурация Firebase (должна совпадать с index.html)
+        // Включим логирование для отладки
+        firebase.database.enableLogging(true);
+
+        // Конфигурация Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyCDBRYFbAZzsc5K95dJQeRVSlyUeS0x2yg",
             authDomain: "kazinaks.firebaseapp.com",
@@ -227,53 +230,60 @@
         const database = firebase.database();
         const auth = firebase.auth();
 
+        // Проверка соединения с Firebase
+        const connectedRef = database.ref(".info/connected");
+        connectedRef.on("value", (snap) => {
+            if (snap.val() === true) {
+                console.log("Connected to Firebase");
+            } else {
+                console.log("Not connected to Firebase");
+                showMessage("Нет соединения с сервером", "error");
+            }
+        });
+
         // Проверка авторизации
         auth.onAuthStateChanged((user) => {
             if (user) {
-                // Пользователь авторизован
+                console.log("User authenticated:", user.uid);
                 document.getElementById('userId').textContent = user.uid;
 
-                // Загрузка баланса пользователя
-                loadUserBalance(user.uid);
-
-                // Слушаем изменения баланса в реальном времени
-                database.ref('users/' + user.uid + '/balance').on('value', (snapshot) => {
-                    const balance = snapshot.val();
-                    if (balance !== null) {
-                        document.getElementById('userBalance').textContent = balance;
-                        localStorage.setItem('casinoBalance', balance);
-                    } else {
-                        // Если баланс не установлен, устанавливаем 1000 по умолчанию
-                        const defaultBalance = 1000;
-                        database.ref('users/' + user.uid).update({ balance: defaultBalance });
-                        document.getElementById('userBalance').textContent = defaultBalance;
-                        localStorage.setItem('casinoBalance', defaultBalance);
-                    }
-                });
+                // Инициализация слушателя баланса
+                initBalanceListener(user.uid);
             } else {
-                // Пользователь не авторизован - перенаправляем на главную страницу
+                console.log("User not authenticated, redirecting");
                 window.location.href = 'index.html';
             }
         });
 
-        // Функция загрузки баланса пользователя
-        function loadUserBalance(userId) {
-            database.ref('users/' + userId + '/balance').once('value').then((snapshot) => {
-                const balance = snapshot.val();
-                if (balance !== null) {
+        // Инициализация слушателя баланса
+        function initBalanceListener(userId) {
+            database.ref('users/' + userId).on('value', (snapshot) => {
+                const userData = snapshot.val();
+                if (userData) {
+                    const balance = userData.balance !== undefined ? userData.balance : 1000;
+                    console.log("Balance updated:", balance);
                     document.getElementById('userBalance').textContent = balance;
                     localStorage.setItem('casinoBalance', balance);
+
+                    // Если баланс не установлен, создаем запись
+                    if (userData.balance === undefined) {
+                        setUserBalance(userId, 1000);
+                    }
                 } else {
-                    // Если баланс не установлен, устанавливаем 1000 по умолчанию
-                    const defaultBalance = 1000;
-                    database.ref('users/' + userId).update({ balance: defaultBalance });
-                    document.getElementById('userBalance').textContent = defaultBalance;
-                    localStorage.setItem('casinoBalance', defaultBalance);
+                    // Если пользователь не существует в базе
+                    setUserBalance(userId, 1000);
                 }
-            }).catch((error) => {
-                console.error("Ошибка при загрузке баланса:", error);
-                document.getElementById('userBalance').textContent = "Ошибка";
+            }, (error) => {
+                console.error("Balance listener error:", error);
+                showMessage("Ошибка загрузки баланса", "error");
             });
+        }
+
+        // Установка баланса пользователя
+        function setUserBalance(userId, amount) {
+            database.ref('users/' + userId).update({ balance: amount })
+                .then(() => console.log("Balance set for user:", userId, amount))
+                .catch(error => console.error("Error setting balance:", error));
         }
 
         // Копирование ID
@@ -281,18 +291,15 @@
             const userId = document.getElementById('userId').textContent;
             if (userId && userId !== 'Загрузка...') {
                 navigator.clipboard.writeText(userId).then(() => {
-                    const message = document.getElementById('transferMessage');
-                    message.textContent = 'ID скопирован в буфер обмена!';
-                    message.className = 'message success';
-                    setTimeout(() => {
-                        message.style.display = 'none';
-                    }, 3000);
+                    showMessage('ID скопирован в буфер обмена!', 'success');
+                }).catch(() => {
+                    showMessage('Не удалось скопировать ID', 'error');
                 });
             }
         });
 
         // Перевод средств
-        document.getElementById('transferBtn').addEventListener('click', function() {
+        document.getElementById('transferBtn').addEventListener('click', async function() {
             const user = auth.currentUser;
             if (!user) {
                 showMessage('Для перевода необходимо войти в систему', 'error');
@@ -301,7 +308,6 @@
 
             const recipientId = document.getElementById('recipientId').value.trim();
             const amount = parseInt(document.getElementById('transferAmount').value);
-            const messageElement = document.getElementById('transferMessage');
 
             // Валидация
             if (!recipientId) {
@@ -309,8 +315,8 @@
                 return;
             }
 
-            if (!amount || amount <= 0) {
-                showMessage('Введите корректную сумму перевода', 'error');
+            if (!amount || isNaN(amount) || amount <= 0) {
+                showMessage('Введите корректную сумму перевода (больше 0)', 'error');
                 return;
             }
 
@@ -319,39 +325,54 @@
                 return;
             }
 
-            // Проверяем баланс отправителя
-            database.ref('users/' + user.uid + '/balance').once('value').then((senderSnapshot) => {
-                const senderBalance = senderSnapshot.val() || 0;
+            try {
+                console.log("Attempting transfer from", user.uid, "to", recipientId, "amount:", amount);
 
-                if (senderBalance < amount) {
+                // Создаем транзакцию для безопасного перевода
+                const senderRef = database.ref('users/' + user.uid);
+                const recipientRef = database.ref('users/' + recipientId);
+
+                // Получаем текущие данные
+                const [senderSnapshot, recipientSnapshot] = await Promise.all([
+                    senderRef.once('value'),
+                    recipientRef.once('value')
+                ]);
+
+                // Проверяем существование получателя
+                if (!recipientSnapshot.exists()) {
+                    showMessage('Получатель не найден', 'error');
+                    return;
+                }
+
+                const senderData = senderSnapshot.val() || { balance: 1000 };
+                const recipientData = recipientSnapshot.val() || { balance: 1000 };
+
+                console.log("Sender balance:", senderData.balance, "Recipient balance:", recipientData.balance);
+
+                // Проверяем баланс
+                if (senderData.balance < amount) {
                     showMessage('Недостаточно средств для перевода', 'error');
                     return;
                 }
 
-                // Проверяем существование получателя
-                database.ref('users/' + recipientId).once('value').then((recipientSnapshot) => {
-                    if (!recipientSnapshot.exists()) {
-                        showMessage('Получатель не найден', 'error');
-                        return;
-                    }
+                // Выполняем обновление
+                const updates = {};
+                updates['users/' + user.uid + '/balance'] = senderData.balance - amount;
+                updates['users/' + recipientId + '/balance'] = recipientData.balance + amount;
 
-                    const recipientData = recipientSnapshot.val();
-                    const recipientBalance = recipientData ? (recipientData.balance || 0) : 0;
+                console.log("Database updates:", updates);
+                await database.ref().update(updates);
 
-                    // Выполняем перевод
-                    const updates = {};
-                    updates['users/' + user.uid + '/balance'] = senderBalance - amount;
-                    updates['users/' + recipientId + '/balance'] = recipientBalance + amount;
+                showMessage(`Успешно переведено ${amount} кредитов`, 'success');
 
-                    database.ref().update(updates).then(() => {
-                        showMessage(`Успешно переведено ${amount} кредитов`, 'success');
-                        document.getElementById('transferAmount').value = '';
-                        document.getElementById('recipientId').value = '';
-                    }).catch((error) => {
-                        showMessage('Ошибка при переводе: ' + error.message, 'error');
-                    });
-                });
-            });
+                // Очищаем поля
+                document.getElementById('transferAmount').value = '';
+                document.getElementById('recipientId').value = '';
+
+            } catch (error) {
+                console.error('Ошибка перевода:', error);
+                showMessage('Ошибка при переводе: ' + error.message, 'error');
+            }
         });
 
         // Показать сообщение

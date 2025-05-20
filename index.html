@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ЯжДэп/</title>
+    <title>дэп</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -184,6 +184,10 @@
             opacity: 0.5;
         }
 
+        .online-counter.error {
+            background-color: rgba(244, 67, 54, 0.2);
+        }
+
         .online-dot {
             width: 10px;
             height: 10px;
@@ -231,7 +235,7 @@
     </div>
 
     <div class="container">
-        <h1>ЯжДэп.ru</h1>
+        <h1>Яждэп.ru</h1>
 
         <div class="online-counter loading">
             <div class="online-dot"></div>
@@ -309,6 +313,114 @@
         const auth = firebase.auth();
         firebase.analytics();
 
+        // ========== ОНЛАЙН СЧЕТЧИК ==========
+        const onlineCounter = document.querySelector('.online-counter');
+        const onlineCountElement = document.getElementById('onlineCount');
+        const ONLINE_TIMEOUT = 300000; // 5 минут
+
+        // Функция обновления счетчика
+        function updateOnlineCount(count) {
+            onlineCountElement.textContent = count;
+            onlineCounter.classList.remove('loading');
+
+            // Анимация обновления
+            onlineCountElement.classList.add('online-count-update');
+            setTimeout(() => {
+                onlineCountElement.classList.remove('online-count-update');
+            }, 300);
+        }
+
+        // Функция для установки онлайн-статуса
+        function setOnlineStatus(userId) {
+            const isGuest = !auth.currentUser;
+            const userRef = database.ref('online_users/' + userId);
+
+            const statusData = {
+                lastActive: firebase.database.ServerValue.TIMESTAMP,
+                isOnline: true,
+                timestamp: Date.now(),
+                isGuest: isGuest,
+                uid: isGuest ? null : userId
+            };
+
+            userRef.set(statusData)
+                .then(() => console.log("Online status updated"))
+                .catch(error => console.error("Error updating online status:", error));
+
+            userRef.onDisconnect().remove();
+        }
+
+        // Функция подсчета активных пользователей
+        function countActiveUsers(snapshot) {
+            if (!snapshot.exists()) return 1; // Минимум 1 (текущий пользователь)
+
+            const now = Date.now();
+            let activeCount = 0;
+
+            snapshot.forEach((childSnapshot) => {
+                const user = childSnapshot.val();
+                if (now - user.timestamp <= ONLINE_TIMEOUT) {
+                    activeCount++;
+                }
+            });
+
+            return activeCount > 0 ? activeCount : 1;
+        }
+
+        // Инициализация онлайн-счетчика
+        function initOnlineCounter() {
+            updateOnlineCount('...');
+
+            const connectedRef = database.ref('.info/connected');
+
+            connectedRef.on('value', (snap) => {
+                if (snap.val() === true) {
+                    const userId = auth.currentUser ? auth.currentUser.uid : 'guest_' + Math.random().toString(36).substr(2, 9);
+                    setOnlineStatus(userId);
+
+                    // Слушаем изменения количества пользователей
+                    database.ref('online_users').on('value', (snapshot) => {
+                        updateOnlineCount(countActiveUsers(snapshot));
+                    });
+
+                    // Периодическая очистка неактивных
+                    setInterval(() => {
+                        database.ref('online_users').once('value').then((snapshot) => {
+                            const now = Date.now();
+                            const updates = {};
+
+                            snapshot.forEach((childSnapshot) => {
+                                const user = childSnapshot.val();
+                                if (now - user.timestamp > ONLINE_TIMEOUT) {
+                                    updates[childSnapshot.key] = null;
+                                }
+                            });
+
+                            if (Object.keys(updates).length > 0) {
+                                database.ref('online_users').update(updates);
+                            }
+                        });
+                    }, 60000); // Каждую минуту
+
+                } else {
+                    database.ref('online_users').once('value').then((snapshot) => {
+                        updateOnlineCount(countActiveUsers(snapshot));
+                    }).catch(() => {
+                        onlineCounter.classList.add('error');
+                        updateOnlineCount('?');
+                    });
+                }
+            });
+
+            // Если через 5 секунд нет ответа
+            setTimeout(() => {
+                if (onlineCountElement.textContent === '...') {
+                    onlineCounter.classList.add('error');
+                    updateOnlineCount('?');
+                }
+            }, 5000);
+        }
+
         // Проверка авторизации
         auth.onAuthStateChanged((user) => {
             const userBtn = document.getElementById('userBtn');
@@ -319,12 +431,18 @@
                 userBtn.textContent = 'Настройки';
                 userBtn.onclick = function() { window.location.href = 'nas.html'; };
 
-                // Загрузка баланса пользователя из базы данных
+                // Загрузка баланса пользователя
                 database.ref('users/' + user.uid).once('value').then((snapshot) => {
                     const userData = snapshot.val();
-                    if (userData && userData.balance) {
+                    if (userData && userData.balance !== undefined) {
                         localStorage.setItem('casinoBalance', userData.balance.toString());
                         document.getElementById('balance').textContent = userData.balance;
+                    } else {
+                        // Устанавливаем баланс по умолчанию
+                        const defaultBalance = 1000;
+                        database.ref('users/' + user.uid).update({ balance: defaultBalance });
+                        document.getElementById('balance').textContent = defaultBalance;
+                        localStorage.setItem('casinoBalance', defaultBalance.toString());
                     }
                 });
             } else {
@@ -340,7 +458,7 @@
                 document.getElementById('balance').textContent = localStorage.getItem('casinoBalance');
             }
 
-            // Инициализация онлайн-счетчика после проверки авторизации
+            // Инициализация онлайн-счетчика
             initOnlineCounter();
         });
 
@@ -373,27 +491,23 @@
             }
 
             if (promoCodes[code] && !promoCodes[code].used) {
-                // Добавляем бонусные кредиты
                 const currentBalance = parseInt(localStorage.getItem('casinoBalance'));
                 const newBalance = currentBalance + promoCodes[code].amount;
+
+                // Обновляем локально и в базе данных
                 localStorage.setItem('casinoBalance', newBalance.toString());
                 document.getElementById('balance').textContent = newBalance;
 
-                // Обновляем баланс в базе данных для авторизованных пользователей
-                if (user) {
-                    database.ref('users/' + user.uid).update({
-                        balance: newBalance
-                    });
-                }
+                database.ref('users/' + user.uid).update({
+                    balance: newBalance
+                }).then(() => {
+                    promoCodes[code].used = true;
+                    showPromoMessage(`Промокод активирован! +${promoCodes[code].amount} кредитов`, 'success');
+                    promoInput.value = '';
+                }).catch(error => {
+                    showPromoMessage('Ошибка при обновлении баланса', 'error');
+                });
 
-                // Помечаем промокод как использованный
-                promoCodes[code].used = true;
-
-                // Показываем сообщение об успехе
-                showPromoMessage(`Промокод активирован! +${promoCodes[code].amount} кредитов`, 'success');
-
-                // Очищаем поле ввода
-                promoInput.value = '';
             } else if (promoCodes[code] && promoCodes[code].used) {
                 showPromoMessage('Этот промокод уже использован', 'error');
             } else {
@@ -405,15 +519,8 @@
         function showPromoMessage(message, type) {
             const promoMessage = document.getElementById('promoMessage');
             promoMessage.textContent = message;
-            promoMessage.className = 'promo-message';
+            promoMessage.className = 'promo-message ' + type;
 
-            if (type === 'success') {
-                promoMessage.classList.add('promo-success');
-            } else if (type === 'error') {
-                promoMessage.classList.add('promo-error');
-            }
-
-            // Автоматическое исчезновение сообщения через 3 секунды
             setTimeout(() => {
                 promoMessage.textContent = '';
                 promoMessage.className = 'promo-message';
@@ -426,96 +533,6 @@
                 applyPromoCode();
             }
         });
-
-        // ========== ИСПРАВЛЕННЫЙ ОНЛАЙН СЧЕТЧИК ==========
-        const onlineCounter = document.querySelector('.online-counter');
-        const onlineCountElement = document.getElementById('onlineCount');
-        const ONLINE_TIMEOUT = 300000; // 5 минут в миллисекундах
-
-        function trackOnlineStatus() {
-            const userId = auth.currentUser ? auth.currentUser.uid : 'guest_' + Math.random().toString(36).substr(2, 9);
-
-            const userRef = database.ref('online_users/' + userId);
-
-            const userData = {
-                lastActive: firebase.database.ServerValue.TIMESTAMP,
-                isOnline: true,
-                timestamp: Date.now(),
-                isGuest: !auth.currentUser
-            };
-
-            userRef.set(userData);
-            userRef.onDisconnect().remove();
-
-            // Периодически очищаем неактивных пользователей
-            database.ref('online_users').once('value').then((snapshot) => {
-                const now = Date.now();
-                const updates = {};
-
-                snapshot.forEach((childSnapshot) => {
-                    const user = childSnapshot.val();
-                    if (now - user.timestamp > ONLINE_TIMEOUT) {
-                        updates[childSnapshot.key] = null;
-                    }
-                });
-
-                if (Object.keys(updates).length > 0) {
-                    database.ref('online_users').update(updates);
-                }
-            });
-
-            // Слушаем изменения количества онлайн-пользователей
-            database.ref('online_users').on('value', (snapshot) => {
-                if (!snapshot.exists()) {
-                    updateOnlineCount(0);
-                    return;
-                }
-
-                const now = Date.now();
-                let activeCount = 0;
-
-                snapshot.forEach((childSnapshot) => {
-                    const user = childSnapshot.val();
-                    if (now - user.timestamp <= ONLINE_TIMEOUT) {
-                        activeCount++;
-                    }
-                });
-
-                updateOnlineCount(activeCount);
-            });
-        }
-
-        function updateOnlineCount(count) {
-            onlineCountElement.textContent = count;
-            onlineCounter.classList.remove('loading');
-
-            // Анимация обновления
-            onlineCountElement.classList.add('online-count-update');
-            setTimeout(() => {
-                onlineCountElement.classList.remove('online-count-update');
-            }, 300);
-        }
-
-        function initOnlineCounter() {
-            const connectedRef = database.ref('.info/connected');
-
-            connectedRef.on('value', (snap) => {
-                if (snap.val() === true) {
-                    trackOnlineStatus();
-                } else {
-                    database.ref('online_users').once('value').then((snapshot) => {
-                        const count = snapshot.exists() ? snapshot.numChildren() : 0;
-                        updateOnlineCount(count > 0 ? count : '1000+');
-                    });
-                }
-            });
-
-            setTimeout(() => {
-                if (onlineCountElement.textContent === '...') {
-                    updateOnlineCount('1000+');
-                }
-            }, 5000);
-        }
     </script>
     <noscript>
         <style>.online-counter {display: none;}</style>

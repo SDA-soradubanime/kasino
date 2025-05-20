@@ -16,6 +16,7 @@
             color: white;
             padding: 20px;
             box-sizing: border-box;
+            overflow-x: hidden;
         }
 
         .container {
@@ -96,6 +97,7 @@
             gap: 10px;
             justify-content: center;
             min-height: 80px;
+            perspective: 1000px;
         }
 
         .card {
@@ -109,7 +111,11 @@
             font-size: 24px;
             color: black;
             position: relative;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+            transform-style: preserve-3d;
+            transform-origin: center;
+            transition: all 0.5s ease;
+            backface-visibility: hidden;
         }
 
         .card.red {
@@ -120,6 +126,83 @@
             background: linear-gradient(135deg, #d10000, #8b0000);
             color: white;
             font-size: 14px;
+            transform: rotateY(180deg);
+        }
+
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card.dealing {
+            animation: dealCard 0.8s ease-out forwards;
+        }
+
+        .card.hit-animation {
+            animation: hitCard 0.6s ease-out forwards;
+        }
+
+        .card.win-animation {
+            animation: winCard 1s ease-in-out infinite alternate;
+        }
+
+        .card.lose-animation {
+            animation: loseCard 0.5s ease-in-out;
+        }
+
+        @keyframes dealCard {
+            0% {
+                transform: translateY(-100px) rotateY(180deg) rotateZ(-30deg) scale(0.8);
+                opacity: 0;
+            }
+            50% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(0) rotateY(0) rotateZ(0) scale(1);
+            }
+        }
+
+        @keyframes hitCard {
+            0% {
+                transform: translateX(-50px) rotateZ(-10deg);
+                opacity: 0;
+            }
+            100% {
+                transform: translateX(0) rotateZ(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes winCard {
+            0% {
+                transform: translateY(0) rotateZ(0);
+                box-shadow: 0 0 10px gold;
+            }
+            100% {
+                transform: translateY(-10px) rotateZ(2deg);
+                box-shadow: 0 0 20px gold;
+            }
+        }
+
+        @keyframes loseCard {
+            0% {
+                transform: translateX(0) rotateZ(0);
+            }
+            20% {
+                transform: translateX(-10px) rotateZ(-5deg);
+            }
+            40% {
+                transform: translateX(10px) rotateZ(5deg);
+            }
+            60% {
+                transform: translateX(-10px) rotateZ(-5deg);
+            }
+            80% {
+                transform: translateX(10px) rotateZ(5deg);
+            }
+            100% {
+                transform: translateX(0) rotateZ(0);
+            }
         }
 
         .game-panel {
@@ -265,6 +348,45 @@
             line-height: 1.4;
         }
 
+        .card-shadow {
+            position: absolute;
+            width: 60px;
+            height: 90px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 5px;
+            filter: blur(5px);
+            z-index: -1;
+            opacity: 0;
+            transition: all 0.3s;
+        }
+
+        .card:hover .card-shadow {
+            opacity: 1;
+            transform: translateY(5px);
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px 15px;
+            }
+
+            .card {
+                width: 50px;
+                height: 75px;
+                font-size: 20px;
+            }
+
+            .controls {
+                gap: 10px;
+            }
+
+            .game-button {
+                padding: 10px 15px;
+                font-size: 14px;
+                min-width: 100px;
+            }
+        }
+
         /* Эффекты */
         .confetti {
             position: fixed;
@@ -334,28 +456,6 @@
             20%, 80% { transform: translateX(2px); }
             30%, 50%, 70% { transform: translateX(-4px); }
             40%, 60% { transform: translateX(4px); }
-        }
-
-        @media (max-width: 600px) {
-            .container {
-                padding: 20px 15px;
-            }
-
-            .card {
-                width: 50px;
-                height: 75px;
-                font-size: 20px;
-            }
-
-            .controls {
-                gap: 10px;
-            }
-
-            .game-button {
-                padding: 10px 15px;
-                font-size: 14px;
-                min-width: 100px;
-            }
         }
     </style>
 </head>
@@ -455,13 +555,77 @@
             }
         }
 
-        // Раздача карты
-        function dealCard(hand, isDealer = false, hidden = false) {
+        // Создание элемента карты
+        function createCardElement(card, isHidden = false) {
+            const cardDiv = document.createElement('div');
+            cardDiv.className = 'card';
+
+            if (isHidden) {
+                cardDiv.classList.add('card-back');
+                cardDiv.textContent = '?';
+            } else {
+                if (card.suit === '♥' || card.suit === '♦') {
+                    cardDiv.classList.add('red');
+                }
+                cardDiv.textContent = card.value + card.suit;
+            }
+
+            const shadow = document.createElement('div');
+            shadow.className = 'card-shadow';
+            cardDiv.appendChild(shadow);
+
+            return cardDiv;
+        }
+
+        // Раздача карты с анимацией
+        function dealCard(hand, isDealer = false, isHidden = false) {
             if (deck.length === 0) createDeck();
             const card = deck.pop();
             hand.push(card);
-            renderCards(isDealer, hidden);
+
+            const cardsDiv = isDealer ? dealerCardsDiv : playerCardsDiv;
+            const cardElement = createCardElement(card, isHidden);
+
+            if (isDealer && isHidden) {
+                // Скрытая карта дилера
+                cardElement.classList.add('card-back');
+                cardsDiv.appendChild(cardElement);
+            } else {
+                // Видимая карта с анимацией
+                cardElement.style.opacity = '0';
+                if (isDealer) {
+                    cardElement.classList.add('dealing');
+                } else {
+                    cardElement.classList.add('hit-animation');
+                }
+                cardsDiv.appendChild(cardElement);
+
+                // Запуск анимации
+                setTimeout(() => {
+                    cardElement.style.opacity = '1';
+                }, 10);
+            }
+
             return card;
+        }
+
+        // Обновление отображения карт и счета
+        function updateCardsDisplay() {
+            // Обновляем счет игрока
+            const playerScore = calculateScore(playerHand);
+            playerScoreSpan.textContent = playerScore > 0 ? `(${playerScore})` : '';
+            playerScoreSpan.style.color = playerScore > 21 ? '#f44336' :
+                                         playerScore === 21 ? '#4CAF50' : '#ddd';
+
+            // Обновляем счет дилера (если не скрыт)
+            if (!gameInProgress || dealerHand.length > 2) {
+                const dealerScore = calculateScore(dealerHand);
+                dealerScoreSpan.textContent = dealerScore > 0 ? `(${dealerScore})` : '';
+                dealerScoreSpan.style.color = dealerScore > 21 ? '#f44336' :
+                                             dealerScore === 21 ? '#4CAF50' : '#ddd';
+            } else {
+                dealerScoreSpan.textContent = '';
+            }
         }
 
         // Подсчет очков
@@ -487,57 +651,6 @@
             }
 
             return score;
-        }
-
-        // Отображение карт
-        function renderCards(isDealer, hideFirstCard = false) {
-            const hand = isDealer ? dealerHand : playerHand;
-            const cardsDiv = isDealer ? dealerCardsDiv : playerCardsDiv;
-            const scoreSpan = isDealer ? dealerScoreSpan : playerScoreSpan;
-
-            cardsDiv.innerHTML = '';
-
-            if (hideFirstCard && isDealer && hand.length > 0) {
-                // Первая карта дилера скрыта
-                const cardDiv = document.createElement('div');
-                cardDiv.className = 'card card-back';
-                cardDiv.textContent = '?';
-                cardsDiv.appendChild(cardDiv);
-
-                // Остальные карты дилера
-                for (let i = 1; i < hand.length; i++) {
-                    addCardToDiv(hand[i], cardsDiv);
-                }
-
-                scoreSpan.textContent = '';
-            } else {
-                // Все карты видны
-                for (let card of hand) {
-                    addCardToDiv(card, cardsDiv);
-                }
-
-                const score = calculateScore(hand);
-                scoreSpan.textContent = score > 0 ? `(${score})` : '';
-
-                // Подсветка счета если перебор или 21
-                if (score > 21) {
-                    scoreSpan.style.color = '#f44336';
-                } else if (score === 21) {
-                    scoreSpan.style.color = '#4CAF50';
-                } else {
-                    scoreSpan.style.color = '#ddd';
-                }
-            }
-        }
-
-        function addCardToDiv(card, div) {
-            const cardDiv = document.createElement('div');
-            cardDiv.className = 'card';
-            if (card.suit === '♥' || card.suit === '♦') {
-                cardDiv.classList.add('red');
-            }
-            cardDiv.textContent = card.value + card.suit;
-            div.appendChild(cardDiv);
         }
 
         // Начало игры
@@ -571,43 +684,81 @@
             balance -= currentBet;
             updateBalance();
 
-            // Раздача карт
-            dealCard(playerHand);
-            dealCard(dealerHand, true, true);
-            dealCard(playerHand);
-            dealCard(dealerHand, true);
+            // Очищаем поля карт
+            dealerCardsDiv.innerHTML = '';
+            playerCardsDiv.innerHTML = '';
+            dealerScoreSpan.textContent = '';
+            playerScoreSpan.textContent = '';
+            messageDisplay.textContent = 'Раздача карт...';
 
-            // Проверка на блэкджек
-            const playerScore = calculateScore(playerHand);
-            if (playerScore === 21) {
-                stand();
-                return;
-            }
+            // Раздача карт с анимацией
+            // 1. Первая карта игрока
+            setTimeout(() => {
+                dealCard(playerHand);
 
-            // Активация кнопок
-            dealButton.disabled = true;
-            hitButton.disabled = false;
-            standButton.disabled = false;
-            doubleButton.disabled = !(balance >= currentBet);
+                // 2. Первая карта дилера (скрытая)
+                setTimeout(() => {
+                    dealCard(dealerHand, true, true);
 
-            messageDisplay.textContent = 'Ваш ход: взять карту или оставить?';
+                    // 3. Вторая карта игрока
+                    setTimeout(() => {
+                        dealCard(playerHand);
+
+                        // 4. Вторая карта дилера (видимая)
+                        setTimeout(() => {
+                            dealCard(dealerHand, true, false);
+
+                            // Проверка на блэкджек
+                            const playerScore = calculateScore(playerHand);
+                            updateCardsDisplay();
+
+                            if (playerScore === 21) {
+                                setTimeout(() => {
+                                    stand();
+                                }, 500);
+                                return;
+                            }
+
+                            // Активация кнопок
+                            dealButton.disabled = true;
+                            hitButton.disabled = false;
+                            standButton.disabled = false;
+                            doubleButton.disabled = !(balance >= currentBet);
+
+                            messageDisplay.textContent = 'Ваш ход: взять карту или оставить?';
+                        }, 300);
+                    }, 300);
+                }, 300);
+            }, 10);
         }
 
         // Взять карту
         function hit() {
             if (!gameInProgress) return;
 
+            hitButton.disabled = true;
+            standButton.disabled = true;
+            doubleButton.disabled = true;
+            messageDisplay.textContent = 'Вы берете карту...';
+
             dealCard(playerHand);
             canDouble = false;
-            doubleButton.disabled = true;
 
-            const playerScore = calculateScore(playerHand);
+            // Проверка результата после анимации
+            setTimeout(() => {
+                updateCardsDisplay();
+                const playerScore = calculateScore(playerHand);
 
-            if (playerScore > 21) {
-                endGame('Вы проиграли - перебор!');
-            } else if (playerScore === 21) {
-                stand();
-            }
+                if (playerScore > 21) {
+                    endGame('Вы проиграли - перебор!');
+                } else if (playerScore === 21) {
+                    stand();
+                } else {
+                    hitButton.disabled = false;
+                    standButton.disabled = false;
+                    messageDisplay.textContent = 'Ваш ход: взять карту или оставить?';
+                }
+            }, 600);
         }
 
         // Удвоить ставку
@@ -618,35 +769,79 @@
             currentBet *= 2;
             updateBalance();
 
+            hitButton.disabled = true;
+            standButton.disabled = true;
+            doubleButton.disabled = true;
+            messageDisplay.textContent = 'Удваиваем ставку...';
+
             dealCard(playerHand);
             canDouble = false;
-            doubleButton.disabled = true;
 
-            const playerScore = calculateScore(playerHand);
+            // Проверка результата после анимации
+            setTimeout(() => {
+                updateCardsDisplay();
+                const playerScore = calculateScore(playerHand);
 
-            if (playerScore > 21) {
-                endGame('Вы проиграли - перебор!');
-            } else {
-                stand();
-            }
+                if (playerScore > 21) {
+                    endGame('Вы проиграли - перебор!');
+                } else {
+                    stand();
+                }
+            }, 600);
         }
 
         // Оставить карты
         function stand() {
             if (!gameInProgress) return;
 
+            hitButton.disabled = true;
+            standButton.disabled = true;
+            doubleButton.disabled = true;
+            messageDisplay.textContent = 'Дилер делает ход...';
+
             // Открываем скрытую карту дилера
-            renderCards(true);
-
-            // Дилер берет карты по правилам
-            let dealerScore = calculateScore(dealerHand);
-            while (dealerScore < 17) {
-                dealCard(dealerHand, true);
-                dealerScore = calculateScore(dealerHand);
+            const firstDealerCard = dealerCardsDiv.children[0];
+            firstDealerCard.classList.remove('card-back');
+            firstDealerCard.textContent = dealerHand[0].value + dealerHand[0].suit;
+            if (dealerHand[0].suit === '♥' || dealerHand[0].suit === '♦') {
+                firstDealerCard.classList.add('red');
             }
+            firstDealerCard.classList.add('flipped');
 
-            // Определение результата
+            // Задержка перед продолжением
+            setTimeout(() => {
+                updateCardsDisplay();
+
+                // Дилер берет карты по правилам
+                let dealerScore = calculateScore(dealerHand);
+
+                const dealerDraw = () => {
+                    if (dealerScore < 17) {
+                        messageDisplay.textContent = 'Дилер берет карту...';
+
+                        setTimeout(() => {
+                            dealCard(dealerHand, true, false);
+                            dealerScore = calculateScore(dealerHand);
+                            updateCardsDisplay();
+
+                            // Рекурсивный вызов с задержкой
+                            setTimeout(dealerDraw, 1000);
+                        }, 300);
+                    } else {
+                        // Определение результата после завершения хода дилера
+                        setTimeout(() => {
+                            determineResult();
+                        }, 500);
+                    }
+                };
+
+                dealerDraw();
+            }, 500);
+        }
+
+        function determineResult() {
             const playerScore = calculateScore(playerHand);
+            const dealerScore = calculateScore(dealerHand);
 
             if (playerScore > 21) {
                 endGame('Вы проиграли - перебор!');
@@ -769,6 +964,11 @@
                 setTimeout(() => {
                     createExplosion(x, y);
                 }, Math.random() * 1000);
+
+                card.classList.add('win-animation');
+                setTimeout(() => {
+                    card.classList.remove('win-animation');
+                }, 3000);
             }
 
             // Подсветка баланса
@@ -781,12 +981,14 @@
         function showLoseEffects() {
             createLoseIcons();
 
-            // Тряска карт игрока
-            const playerCards = document.getElementById('player-cards');
-            playerCards.classList.add('lose-shake');
-            setTimeout(() => {
-                playerCards.classList.remove('lose-shake');
-            }, 500);
+            // Анимация карт игрока
+            const playerCards = document.getElementById('player-cards').children;
+            for (let card of playerCards) {
+                card.classList.add('lose-animation');
+                setTimeout(() => {
+                    card.classList.remove('lose-animation');
+                }, 500);
+            }
         }
 
         // Завершение игры
@@ -802,7 +1004,7 @@
             }
 
             messageDisplay.textContent = message;
-            
+
             // Деактивация кнопок
             dealButton.disabled = false;
             hitButton.disabled = true;
@@ -818,7 +1020,10 @@
 
         betAmountInput.addEventListener('change', function() {
             currentBet = parseInt(this.value);
-            if (isNaN(currentBet) || currentBet < 10) {
+            if (isNaN(currentBet)) {
+                this.value = 10;
+                currentBet = 10;
+            } else if (currentBet < 10) {
                 this.value = 10;
                 currentBet = 10;
             } else if (currentBet > balance) {

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Настройки - Game Casino Simulator</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: white;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: rgba(0, 0, 0, 0.7);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            max-width: 800px;
+            width: 100%;
+            margin-top: 20px;
+        }
+
+        h1 {
+            color: #f8d347;
+            text-shadow: 0 0 10px rgba(248, 211, 71, 0.5);
+            margin-bottom: 20px;
+        }
+
+        .settings-section {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: rgba(51, 51, 51, 0.7);
+            border-radius: 10px;
+            text-align: left;
+        }
+
+        .settings-title {
+            color: #f8d347;
+            font-size: 18px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .settings-title i {
+            font-size: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            background-color: #444;
+            color: white;
+            box-sizing: border-box;
+        }
+
+        .btn {
+            background-color: #f8d347;
+            color: #333;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            background-color: #ffea00;
+            transform: scale(1.02);
+        }
+
+        .btn-back {
+            background-color: rgba(248, 211, 71, 0.3);
+            color: #f8d347;
+            margin-top: 30px;
+        }
+
+        .btn-back:hover {
+            background-color: rgba(248, 211, 71, 0.5);
+        }
+
+        .user-id {
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            word-break: break-all;
+            margin-top: 10px;
+        }
+
+        .copy-btn {
+            background-color: rgba(248, 211, 71, 0.2);
+            color: #f8d347;
+            border: 1px solid #f8d347;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 5px;
+            transition: all 0.3s;
+        }
+
+        .copy-btn:hover {
+            background-color: rgba(248, 211, 71, 0.4);
+        }
+
+        .message {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .success {
+            background-color: rgba(76, 175, 80, 0.2);
+            border: 1px solid #4caf50;
+            color: #4caf50;
+            display: block;
+        }
+
+        .error {
+            background-color: rgba(244, 67, 54, 0.2);
+            border: 1px solid #f44336;
+            color: #f44336;
+            display: block;
+        }
+
+        .balance-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #444;
+        }
+
+        .balance-amount {
+            font-weight: bold;
+            color: #f8d347;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚙️ Настройки аккаунта</h1>
+
+        <div class="settings-section">
+            <div class="settings-title"><i>🆔</i> Ваш ID</div>
+            <div id="userId" class="user-id">Загрузка...</div>
+            <button id="copyIdBtn" class="copy-btn">Копировать ID</button>
+        </div>
+
+        <div class="settings-section">
+            <div class="settings-title"><i>💰</i> Перевод средств</div>
+
+            <div class="balance-info">
+                <span>Ваш баланс:</span>
+                <span id="userBalance" class="balance-amount">Загрузка...</span>
+            </div>
+
+            <div class="form-group">
+                <label for="recipientId">ID получателя:</label>
+                <input type="text" id="recipientId" placeholder="Введите ID пользователя">
+            </div>
+
+            <div class="form-group">
+                <label for="transferAmount">Сумма перевода:</label>
+                <input type="number" id="transferAmount" placeholder="Введите сумму">
+            </div>
+
+            <button id="transferBtn" class="btn">Перевести</button>
+
+            <div id="transferMessage" class="message"></div>
+        </div>
+
+        <button onclick="window.location.href='index.html'" class="btn btn-back">← Вернуться на главную</button>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+
+    <script>
+        // Конфигурация Firebase (должна совпадать с index.html)
+        const firebaseConfig = {
+            apiKey: "AIzaSyCDBRYFbAZzsc5K95dJQeRVSlyUeS0x2yg",
+            authDomain: "kazinaks.firebaseapp.com",
+            databaseURL: "https://kazinaks-default-rtdb.firebaseio.com",
+            projectId: "kazinaks",
+            storageBucket: "kazinaks.appspot.com",
+            messagingSenderId: "923668859204",
+            appId: "1:923668859204:web:3696ac595e106b6f226f11",
+            measurementId: "G-7CYFK7BGL0"
+        };
+
+        // Инициализация Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const database = firebase.database();
+        const auth = firebase.auth();
+
+        // Проверка авторизации
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                // Пользователь авторизован
+                document.getElementById('userId').textContent = user.uid;
+
+                // Загрузка баланса пользователя
+                loadUserBalance(user.uid);
+
+                // Слушаем изменения баланса в реальном времени
+                database.ref('users/' + user.uid + '/balance').on('value', (snapshot) => {
+                    const balance = snapshot.val();
+                    if (balance !== null) {
+                        document.getElementById('userBalance').textContent = balance;
+                        localStorage.setItem('casinoBalance', balance);
+                    } else {
+                        // Если баланс не установлен, устанавливаем 1000 по умолчанию
+                        const defaultBalance = 1000;
+                        database.ref('users/' + user.uid).update({ balance: defaultBalance });
+                        document.getElementById('userBalance').textContent = defaultBalance;
+                        localStorage.setItem('casinoBalance', defaultBalance);
+                    }
+                });
+            } else {
+                // Пользователь не авторизован - перенаправляем на главную страницу
+                window.location.href = 'index.html';
+            }
+        });
+
+        // Функция загрузки баланса пользователя
+        function loadUserBalance(userId) {
+            database.ref('users/' + userId + '/balance').once('value').then((snapshot) => {
+                const balance = snapshot.val();
+                if (balance !== null) {
+                    document.getElementById('userBalance').textContent = balance;
+                    localStorage.setItem('casinoBalance', balance);
+                } else {
+                    // Если баланс не установлен, устанавливаем 1000 по умолчанию
+                    const defaultBalance = 1000;
+                    database.ref('users/' + userId).update({ balance: defaultBalance });
+                    document.getElementById('userBalance').textContent = defaultBalance;
+                    localStorage.setItem('casinoBalance', defaultBalance);
+                }
+            }).catch((error) => {
+                console.error("Ошибка при загрузке баланса:", error);
+                document.getElementById('userBalance').textContent = "Ошибка";
+            });
+        }
+
+        // Копирование ID
+        document.getElementById('copyIdBtn').addEventListener('click', function() {
+            const userId = document.getElementById('userId').textContent;
+            if (userId && userId !== 'Загрузка...') {
+                navigator.clipboard.writeText(userId).then(() => {
+                    const message = document.getElementById('transferMessage');
+                    message.textContent = 'ID скопирован в буфер обмена!';
+                    message.className = 'message success';
+                    setTimeout(() => {
+                        message.style.display = 'none';
+                    }, 3000);
+                });
+            }
+        });
+
+        // Перевод средств
+        document.getElementById('transferBtn').addEventListener('click', function() {
+            const user = auth.currentUser;
+            if (!user) {
+                showMessage('Для перевода необходимо войти в систему', 'error');
+                return;
+            }
+
+            const recipientId = document.getElementById('recipientId').value.trim();
+            const amount = parseInt(document.getElementById('transferAmount').value);
+            const messageElement = document.getElementById('transferMessage');
+
+            // Валидация
+            if (!recipientId) {
+                showMessage('Введите ID получателя', 'error');
+                return;
+            }
+
+            if (!amount || amount <= 0) {
+                showMessage('Введите корректную сумму перевода', 'error');
+                return;
+            }
+
+            if (recipientId === user.uid) {
+                showMessage('Нельзя переводить средства самому себе', 'error');
+                return;
+            }
+
+            // Проверяем баланс отправителя
+            database.ref('users/' + user.uid + '/balance').once('value').then((senderSnapshot) => {
+                const senderBalance = senderSnapshot.val() || 0;
+
+                if (senderBalance < amount) {
+                    showMessage('Недостаточно средств для перевода', 'error');
+                    return;
+                }
+
+                // Проверяем существование получателя
+                database.ref('users/' + recipientId).once('value').then((recipientSnapshot) => {
+                    if (!recipientSnapshot.exists()) {
+                        showMessage('Получатель не найден', 'error');
+                        return;
+                    }
+
+                    const recipientData = recipientSnapshot.val();
+                    const recipientBalance = recipientData ? (recipientData.balance || 0) : 0;
+
+                    // Выполняем перевод
+                    const updates = {};
+                    updates['users/' + user.uid + '/balance'] = senderBalance - amount;
+                    updates['users/' + recipientId + '/balance'] = recipientBalance + amount;
+
+                    database.ref().update(updates).then(() => {
+                        showMessage(`Успешно переведено ${amount} кредитов`, 'success');
+                        document.getElementById('transferAmount').value = '';
+                        document.getElementById('recipientId').value = '';
+                    }).catch((error) => {
+                        showMessage('Ошибка при переводе: ' + error.message, 'error');
+                    });
+                });
+            });
+        });
+
+        // Показать сообщение
+        function showMessage(text, type) {
+            const messageElement = document.getElementById('transferMessage');
+            messageElement.textContent = text;
+            messageElement.className = 'message ' + type;
+            messageElement.style.display = 'block';
+
+            setTimeout(() => {
+                messageElement.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

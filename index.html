@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ЯжКазино.ru</title>
+    <title>Game Casino Simulator</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -177,7 +177,7 @@
             display: inline-flex;
             align-items: center;
             gap: 5px;
-            transition: opacity 0.3s;
+            transition: all 0.3s;
         }
 
         .online-counter.loading {
@@ -190,6 +190,15 @@
             background-color: #4caf50;
             border-radius: 50%;
             animation: pulse 1.5s infinite;
+        }
+
+        .online-count {
+            transition: all 0.3s ease;
+        }
+
+        .online-count-update {
+            transform: scale(1.1);
+            color: #f8d347;
         }
 
         @keyframes pulse {
@@ -218,7 +227,7 @@
 </head>
 <body>
     <div class="user-controls">
-        <button id="userBtn" class="user-btn" onclick="window.location.href='reg.html'">Вход/Регистрация</button>
+        <button id="userBtn" class="user-btn">Вход/Регистрация</button>
     </div>
 
     <div class="container">
@@ -227,7 +236,7 @@
 
         <div class="online-counter loading">
             <div class="online-dot"></div>
-            <span id="onlineCount">...</span> игроков онлайн
+            <span id="onlineCount" class="online-count">...</span> игроков онлайн
         </div>
 
         <div class="balance">
@@ -277,6 +286,7 @@
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-analytics.js"></script>
 
     <script>
@@ -297,25 +307,46 @@
             firebase.initializeApp(firebaseConfig);
         }
         const database = firebase.database();
+        const auth = firebase.auth();
         firebase.analytics();
 
         // Проверка авторизации
-        const isLoggedIn = localStorage.getItem('casinoLoggedIn') === 'true';
-        const userBtn = document.getElementById('userBtn');
+        auth.onAuthStateChanged((user) => {
+            const userBtn = document.getElementById('userBtn');
 
-        if (isLoggedIn) {
-            userBtn.textContent = 'Настройки';
-            userBtn.onclick = function() { window.location.href = 'account.html'; };
-        } else {
-            userBtn.textContent = 'Вход/Регистрация';
-            userBtn.onclick = function() { window.location.href = 'reg.html'; };
-        }
+            if (user) {
+                // Пользователь авторизован
+                localStorage.setItem('casinoLoggedIn', 'true');
+                userBtn.textContent = 'Настройки';
+                userBtn.onclick = function() { window.location.href = 'nas.html'; };
+
+                // Загрузка баланса пользователя из базы данных
+                database.ref('users/' + user.uid).once('value').then((snapshot) => {
+                    const userData = snapshot.val();
+                    if (userData && userData.balance) {
+                        localStorage.setItem('casinoBalance', userData.balance.toString());
+                        document.getElementById('balance').textContent = userData.balance;
+                    }
+                });
+            } else {
+                // Пользователь не авторизован
+                localStorage.removeItem('casinoLoggedIn');
+                userBtn.textContent = 'Вход/Регистрация';
+                userBtn.onclick = function() { window.location.href = 'reg.html'; };
+
+                // Устанавливаем стандартный баланс для гостя
+                if (!localStorage.getItem('casinoBalance')) {
+                    localStorage.setItem('casinoBalance', '1000');
+                }
+                document.getElementById('balance').textContent = localStorage.getItem('casinoBalance');
+            }
+
+            // Инициализация онлайн-счетчика после проверки авторизации
+            initOnlineCounter();
+        });
 
         // Сохраняем баланс между страницами
-        if (!localStorage.getItem('casinoBalance')) {
-            localStorage.setItem('casinoBalance', '1000');
-        }
-        document.getElementById('balance').textContent = localStorage.getItem('casinoBalance');
+        document.getElementById('balance').textContent = localStorage.getItem('casinoBalance') || '1000';
 
         // Список активных промокодов
         const promoCodes = {
@@ -327,6 +358,12 @@
 
         // Применение промокода
         function applyPromoCode() {
+            const user = auth.currentUser;
+            if (!user) {
+                showPromoMessage('Для активации промокода необходимо войти', 'error');
+                return;
+            }
+
             const promoInput = document.getElementById('promoCode');
             const promoMessage = document.getElementById('promoMessage');
             const code = promoInput.value.trim().toLowerCase();
@@ -342,6 +379,13 @@
                 const newBalance = currentBalance + promoCodes[code].amount;
                 localStorage.setItem('casinoBalance', newBalance.toString());
                 document.getElementById('balance').textContent = newBalance;
+
+                // Обновляем баланс в базе данных для авторизованных пользователей
+                if (user) {
+                    database.ref('users/' + user.uid).update({
+                        balance: newBalance
+                    });
+                }
 
                 // Помечаем промокод как использованный
                 promoCodes[code].used = true;
@@ -384,82 +428,94 @@
             }
         });
 
-        // ========== ОНЛАЙН СЧЕТЧИК ==========
+        // ========== ИСПРАВЛЕННЫЙ ОНЛАЙН СЧЕТЧИК ==========
         const onlineCounter = document.querySelector('.online-counter');
         const onlineCountElement = document.getElementById('onlineCount');
+        const ONLINE_TIMEOUT = 300000; // 5 минут в миллисекундах
 
-        // Генерация ID пользователя
-        function generateUserId() {
-            return 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-        }
-
-        // Отслеживание онлайн-пользователей
-        function trackOnlineUsers() {
-            const userId = localStorage.getItem('casinoUserId') || generateUserId();
-            localStorage.setItem('casinoUserId', userId);
+        function trackOnlineStatus() {
+            const userId = auth.currentUser ? auth.currentUser.uid : 'guest_' + Math.random().toString(36).substr(2, 9);
 
             const userRef = database.ref('online_users/' + userId);
 
-            // Устанавливаем данные пользователя
-            userRef.set({
-                lastOnline: firebase.database.ServerValue.TIMESTAMP,
+            const userData = {
+                lastActive: firebase.database.ServerValue.TIMESTAMP,
+                isOnline: true,
                 timestamp: Date.now(),
-                isActive: true
-            });
+                isGuest: !auth.currentUser
+            };
 
-            // Удаляем при отключении
+            userRef.set(userData);
             userRef.onDisconnect().remove();
 
-            // Счетчик онлайн
-            database.ref('online_users').on('value', (snapshot) => {
-                if (snapshot.exists()) {
-                    const users = snapshot.val();
-                    const now = Date.now();
-                    let activeCount = 0;
+            // Периодически очищаем неактивных пользователей
+            database.ref('online_users').once('value').then((snapshot) => {
+                const now = Date.now();
+                const updates = {};
 
-                    // Фильтруем только активных (последние 5 минут)
-                    Object.values(users).forEach(user => {
-                        if (now - user.timestamp < 300000) { // 5 минут
-                            activeCount++;
-                        }
-                    });
+                snapshot.forEach((childSnapshot) => {
+                    const user = childSnapshot.val();
+                    if (now - user.timestamp > ONLINE_TIMEOUT) {
+                        updates[childSnapshot.key] = null;
+                    }
+                });
 
-                    onlineCountElement.textContent = activeCount;
-                    onlineCounter.classList.remove('loading');
-                } else {
-                    onlineCountElement.textContent = '1000+';
-                    onlineCounter.classList.remove('loading');
+                if (Object.keys(updates).length > 0) {
+                    database.ref('online_users').update(updates);
                 }
-            }, (error) => {
-                console.error("Ошибка счетчика:", error);
-                onlineCountElement.textContent = '1000+';
-                onlineCounter.classList.remove('loading');
+            });
+
+            // Слушаем изменения количества онлайн-пользователей
+            database.ref('online_users').on('value', (snapshot) => {
+                if (!snapshot.exists()) {
+                    updateOnlineCount(0);
+                    return;
+                }
+
+                const now = Date.now();
+                let activeCount = 0;
+
+                snapshot.forEach((childSnapshot) => {
+                    const user = childSnapshot.val();
+                    if (now - user.timestamp <= ONLINE_TIMEOUT) {
+                        activeCount++;
+                    }
+                });
+
+                updateOnlineCount(activeCount);
             });
         }
 
-        // Проверка соединения с Firebase
-        database.ref('.info/connected').on('value', (snap) => {
-            if (snap.val() === true) {
-                trackOnlineUsers();
-            } else {
-                onlineCountElement.textContent = '1000+';
-                onlineCounter.classList.remove('loading');
-            }
-        });
+        function updateOnlineCount(count) {
+            onlineCountElement.textContent = count;
+            onlineCounter.classList.remove('loading');
 
-        // Таймаут на случай проблем с соединением
-        setTimeout(() => {
-            if (onlineCountElement.textContent === '...') {
-                onlineCountElement.textContent = '1000+';
-                onlineCounter.classList.remove('loading');
-            }
-        }, 5000);
+            // Анимация обновления
+            onlineCountElement.classList.add('online-count-update');
+            setTimeout(() => {
+                onlineCountElement.classList.remove('online-count-update');
+            }, 300);
+        }
 
-        // Для GitHub Pages - дополнительная проверка
-        if (window.location.host.includes('github.io')) {
-            database.ref('gh_pages').set({
-                lastPing: firebase.database.ServerValue.TIMESTAMP
+        function initOnlineCounter() {
+            const connectedRef = database.ref('.info/connected');
+
+            connectedRef.on('value', (snap) => {
+                if (snap.val() === true) {
+                    trackOnlineStatus();
+                } else {
+                    database.ref('online_users').once('value').then((snapshot) => {
+                        const count = snapshot.exists() ? snapshot.numChildren() : 0;
+                        updateOnlineCount(count > 0 ? count : '1000+');
+                    });
+                }
             });
+
+            setTimeout(() => {
+                if (onlineCountElement.textContent === '...') {
+                    updateOnlineCount('1000+');
+                }
+            }, 5000);
         }
     </script>
     <noscript>

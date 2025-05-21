@@ -311,7 +311,7 @@
 
                 <div class="setting-group">
                     <label for="betAmount">Ставка:</label>
-                    <input type="number" id="betAmount" min="1" max="1000" value="10">
+                    <input type="number" id="betAmount" min="1" max="1000" value="1">
                 </div>
             </div>
 
@@ -323,7 +323,7 @@
         </div>
 
         <div class="controls">
-            <button id="spinButton" class="spin-button">Крутить (10 кредитов)</button>
+            <button id="spinButton" class="spin-button">Крутить (1 кредит)</button>
         </div>
 
         <div class="info">
@@ -334,7 +334,7 @@
     <script>
         // Инициализация переменных
         const symbols = ['🍒', '🍋', '🍊', '🍇', '🍉', '7️⃣', '🔔', '⭐'];
-        const symbolWeights = [15, 15, 15, 12, 12, 8, 10, 13]; // Веса для вероятностей
+        const symbolWeights = [10, 10, 10, 12, 12, 15, 15, 16]; // Новые веса для увеличения шансов
         let reels = [];
         let spinButton = document.getElementById('spinButton');
         let balanceDisplay = document.getElementById('balance');
@@ -348,7 +348,7 @@
 
         // Настройки игры
         let reelCount = 3;
-        let betAmount = 10;
+        let betAmount = 1;
         let isSpinning = false;
 
         // Взвешенный случайный символ
@@ -393,9 +393,9 @@
             if (isNaN(betAmount) || betAmount < 1) {
                 betAmount = 1;
                 this.value = 1;
-            } else if (betAmount > 100000000000000000000000000000000000000000000000000000000) {
-                betAmount = 100000000000000000000000000000000000000000000000000000000;
-                this.value = 100000000000000000000000000000000000000000000000000000000;
+            } else if (betAmount > 1000) {
+                betAmount = 1000;
+                this.value = 1000;
             }
             spinButton.textContent = `Крутить (${betAmount} кредитов)`;
         });
@@ -420,26 +420,41 @@
             update();
         }
 
-        // Расчет выигрыша (только 3 в ряд)
+        // Расчет выигрыша (3 или 2 в ряд)
         function calculateWin(results) {
-            // Проверяем только комбинации из 3 одинаковых символов подряд
+            // Проверяем комбинации из 3 одинаковых символов подряд
             for (let i = 0; i <= results.length - 3; i++) {
                 if (results[i] === results[i+1] && results[i+1] === results[i+2]) {
                     const winningSymbol = results[i];
                     let basePayout = 0;
 
-                    // Определяем базовую выплату для символа
+                    // Определяем базовую выплату для символа (увеличенные выплаты)
                     switch(winningSymbol) {
-                        case '7️⃣': basePayout = 5; break;
-                        case '⭐': basePayout = 4; break;
-                        case '🔔': basePayout = 3; break;
-                        default: basePayout = 2; break;
+                        case '7️⃣': basePayout = 8; break;
+                        case '⭐': basePayout = 6; break;
+                        case '🔔': basePayout = 4; break;
+                        default: basePayout = 3; break;
                     }
 
-                    // Меньший множитель (1.25)
-                    const winAmount = Math.round(betAmount * basePayout * 1.25);
+                    // Увеличенный множитель (1.5 вместо 1.25)
+                    const winAmount = Math.round(betAmount * basePayout * 1.5);
 
                     return { amount: winAmount, symbol: winningSymbol, count: 3 };
+                }
+                else if (results[i] === results[i+1]) {
+                    // Выплата за 2 одинаковых символа подряд
+                    const winningSymbol = results[i];
+                    let basePayout = 1; // Базовая выплата для 2 символов
+
+                    switch(winningSymbol) {
+                        case '7️⃣': basePayout = 2; break;
+                        case '⭐': basePayout = 1.5; break;
+                        case '🔔': basePayout = 1.25; break;
+                        default: basePayout = 1; break;
+                    }
+
+                    const winAmount = Math.round(betAmount * basePayout * 1.2);
+                    return { amount: winAmount, symbol: winningSymbol, count: 2 };
                 }
             }
 

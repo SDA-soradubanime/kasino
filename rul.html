@@ -147,11 +147,13 @@
             background: radial-gradient(circle at 30% 30%, white, #e0e0e0);
             border-radius: 50%;
             position: absolute;
-            top: 15px;
-            left: 116px;
+            top: 50%;
+            left: 50%;
+            margin-top: -9px;
+            margin-left: -9px;
             z-index: 15;
             box-shadow: 0 0 5px rgba(0,0,0,0.7);
-            transform-origin: 125px 125px;
+            transform: translate(0, -110px);
         }
 
         .roulette-table {
@@ -315,9 +317,9 @@
             .ball {
                 width: 15px;
                 height: 15px;
-                top: 12px;
-                left: 93px;
-                transform-origin: 100px 100px;
+                margin-top: -7.5px;
+                margin-left: -7.5px;
+                transform: translate(0, -85px);
             }
 
             .roulette-table {
@@ -519,24 +521,30 @@
             let rotations = 0;
             const maxRotations = 3 + Math.random() * 2;
             const winningNumber = numbers[Math.floor(Math.random() * numbers.length)];
-            const ballOffset = 110; // Расстояние от центра до мячика
+            const ballRadius = 110; // Расстояние от центра до мячика
+
+            // Начальное положение шарика
+            ball.style.transform = `rotate(0deg) translate(0, -${ballRadius}px) rotate(0deg)`;
 
             spinAnimation = setInterval(() => {
                 rotations += 0.05;
                 const currentAngle = (rotations * 360) % 360;
-                ball.style.transform = `rotate(${currentAngle}deg) translate(0, -${ballOffset}px) rotate(${-currentAngle}deg)`;
+
+                // Обновляем позицию шарика
+                ball.style.transform = `rotate(${currentAngle}deg) translate(0, -${ballRadius}px) rotate(${-currentAngle}deg)`;
 
                 if (rotations >= maxRotations) {
                     clearInterval(spinAnimation);
                     setTimeout(() => {
                         // Плавная остановка на выигрышном номере
-                        const winningAngle = (numbers.findIndex(n => n.num === winningNumber.num) / numbers.length) * 360;
+                        const winningIndex = numbers.findIndex(n => n.num === winningNumber.num);
+                        const winningAngle = (winningIndex / numbers.length) * 360;
                         const finalAngle = (maxRotations * 360) + winningAngle;
 
                         let stopRotation = maxRotations * 360;
                         const stopAnimation = setInterval(() => {
                             stopRotation += 0.5;
-                            ball.style.transform = `rotate(${stopRotation}deg) translate(0, -${ballOffset}px) rotate(${-stopRotation}deg)`;
+                            ball.style.transform = `rotate(${stopRotation}deg) translate(0, -${ballRadius}px) rotate(${-stopRotation}deg)`;
 
                             if (stopRotation >= finalAngle) {
                                 clearInterval(stopAnimation);

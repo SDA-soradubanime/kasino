@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>12-часовой отсчёт (04.06.2025)</title>
+    <title>12-часовой отсчёт (04.07.2025 МСК)</title>
     <style>
         body {
             display: flex;
@@ -56,27 +57,48 @@
         @keyframes blink {
             50% { opacity: 0.7; }
         }
+        
+        .timezone {
+            font-size: 1.5vw;
+            margin-top: 10px;
+            color: #aaa;
+        }
     </style>
 </head>
 <body>
     <div id="countdown">
         <div id="timer">--:--:--</div>
-        <div class="label">ДО ОКОНЧАНИЯ ОТСЧЁТА (20:00 04.06.2025)</div>
+        <div class="label">ДО ОКОНЧАНИЯ ОТСЧЁТА</div>
         <div class="progress-container">
             <div class="progress-bar" id="progress"></div>
         </div>
+        <div class="timezone">Московское время (MSK, UTC+3) | 04.07.2025 08:00-20:00</div>
     </div>
 
     <script>
-        // Фиксированная дата окончания: 20:00 04.06.2025 (UTC+0 или локальное время)
-        const endDate = new Date(2025, 5, 4, 20, 0, 0); // Месяц 5 = июнь (0-11)
+        // Настройки для московского времени (04.07.2025)
+        const startTime = new Date(2025, 6, 4, 8, 0, 0); // 6 = ИЮЛЬ (0-11)
+        const endTime = new Date(2025, 6, 4, 20, 0, 0);  // 20:00 04.07.2025 МСК
+        const mskOffset = 3 * 60 * 60 * 1000; // UTC+3 в миллисекундах
+        
+        // Получаем текущее московское время
+        function getMoscowTime() {
+            const now = new Date();
+            const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+            return new Date(utc + mskOffset);
+        }
         
         function updateCountdown() {
-            const now = new Date();
-            const diff = endDate - now;
+            const now = getMoscowTime();
+            let diff = endTime - now;
             
-            // Если время уже прошло
-            if (diff <= 0) {
+            if (now < startTime) {
+                // До начала отсчёта
+                diff = startTime - now;
+                document.querySelector('.label').textContent = "ДО НАЧАЛА ОТСЧЁТА";
+                document.getElementById('progress').style.transform = "scaleX(0)";
+            } else if (now >= endTime) {
+                // Отсчёт завершён
                 document.getElementById('timer').textContent = "00:00:00";
                 document.getElementById('progress').style.transform = "scaleX(1)";
                 document.getElementById('timer').classList.add('blink');
@@ -93,12 +115,13 @@
             document.getElementById('timer').textContent = 
                 `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             
-            // Обновляем прогресс-бар (12 часов = 43200000 мс)
-            const progressPercentage = 100 - (diff / (12 * 60 * 60 * 1000)) * 100;
+            // Обновляем прогресс-бар
+            const elapsed = now - startTime;
+            const progressPercentage = (elapsed / (12 * 60 * 60 * 1000)) * 100;
             document.getElementById('progress').style.transform = `scaleX(${progressPercentage / 100})`;
             
             // Мигание при последних 10 секундах
-            if (totalSeconds <= 10) {
+            if (now >= startTime && totalSeconds <= 10) {
                 document.getElementById('timer').classList.add('blink');
             } else {
                 document.getElementById('timer').classList.remove('blink');
@@ -107,7 +130,7 @@
         
         // Запускаем обновление каждую секунду
         setInterval(updateCountdown, 1000);
-        updateCountdown(); // Инициализация
+        updateCountdown();
     </script>
 </body>
 </html>
